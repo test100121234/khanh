@@ -11,11 +11,11 @@ struct CompressionContext {
     dispatch_semaphore_t semaphore;
 };
 
-static void VTCompressionOutputCallback(void *outputCallbackRefCon,
-                                        void *sourceFrameRefCon,
-                                        OSStatus status,
-                                        VTEncodeInfoFlags infoFlags,
-                                        CMSampleBufferRef sampleBuffer) {
+static void ScreenVTCompressionOutputCallback(void *outputCallbackRefCon,
+                                              void *sourceFrameRefCon,
+                                              OSStatus status,
+                                              VTEncodeInfoFlags infoFlags,
+                                              CMSampleBufferRef sampleBuffer) {
     struct CompressionContext *ctx = (struct CompressionContext *)outputCallbackRefCon;
     if (status == noErr && sampleBuffer) {
         CMBlockBufferRef blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer);
@@ -91,7 +91,7 @@ static void VTCompressionOutputCallback(void *outputCallbackRefCon,
                                                  height,
                                                  kCMVideoCodecType_JPEG,
                                                  NULL, NULL, NULL,
-                                                 VTCompressionOutputCallback,
+                                                 ScreenVTCompressionOutputCallback,
                                                  NULL, // set dynamically per frame
                                                  &_compressionSession);
 
@@ -123,7 +123,7 @@ static void VTCompressionOutputCallback(void *outputCallbackRefCon,
 }
 
 - (CVPixelBufferRef)createPixelBufferFromScreen {
-    CGImageRef screenImage = NULL;
+    __block CGImageRef screenImage = NULL;
     
     if (&UIGetScreenImage != NULL) {
         screenImage = UIGetScreenImage();

@@ -2,9 +2,9 @@
 #import <UIKit/UIKit.h>
 #import <IOSurface/IOSurfaceRef.h>
 #import <mach/mach_time.h>
+#import <dlfcn.h>
 
-// Private CoreGraphics / UIKit SPI for fast screen extraction
-OBJC_EXPORT CGImageRef UIGetScreenImage(void);
+typedef CGImageRef (*UIGetScreenImageFunc)(void);
 
 struct CompressionContext {
     __unsafe_unretained NSMutableData *outputData;
@@ -125,8 +125,14 @@ static void ScreenVTCompressionOutputCallback(void *outputCallbackRefCon,
 - (CVPixelBufferRef)createPixelBufferFromScreen {
     __block CGImageRef screenImage = NULL;
     
-    if (&UIGetScreenImage != NULL) {
-        screenImage = UIGetScreenImage();
+    static UIGetScreenImageFunc s_UIGetScreenImage = NULL;
+    static dispatch_once_t s_dlsymOnceToken;
+    dispatch_once(&s_dlsymOnceToken, ^{
+        s_UIGetScreenImage = (UIGetScreenImageFunc)dlsym(RTLD_DEFAULT, "UIGetScreenImage");
+    });
+    
+    if (s_UIGetScreenImage != NULL) {
+        screenImage = s_UIGetScreenImage();
     }
     
     if (!screenImage) {

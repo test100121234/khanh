@@ -125,23 +125,27 @@ if [[ ! -d "$APP_PATH" ]]; then
     exit 1
 fi
 
-echo "[+] Step 5: Packaging & Signing IPA with zsign..."
-OUTPUT_IPA="${OUTPUT_DIR}/${SCHEME}-enterprise.ipa"
+echo "[+] Step 5: Packaging & Signing Enterprise IPA..."
+OUTPUT_IPA="${OUTPUT_DIR}/${SCHEME}-enterprise-signed.ipa"
+UNSIGNED_IPA="${BUILD_DIR}/unsigned.ipa"
+
+rm -rf "$BUILD_DIR/Payload" "$UNSIGNED_IPA"
+mkdir -p "$BUILD_DIR/Payload"
+cp -r "$APP_PATH" "$BUILD_DIR/Payload/"
+(cd "$BUILD_DIR" && zip -qry "unsigned.ipa" Payload)
+rm -rf "$BUILD_DIR/Payload"
 
 if command -v zsign &> /dev/null; then
+    echo "[*] Signing IPA with zsign and Enterprise Certificate..."
     zsign -k "$P12_CERTIFICATE" \
           -p "$P12_PASSWORD" \
           -m "$PROVISION_PROFILE" \
           -e "$ENTITLEMENTS_PATH" \
           -o "$OUTPUT_IPA" \
-          "$APP_PATH"
+          "$UNSIGNED_IPA"
 else
-    echo "[-] zsign not found in PATH. Packaging unsigned IPA into $OUTPUT_IPA..."
-    rm -rf "$BUILD_DIR/Payload"
-    mkdir -p "$BUILD_DIR/Payload"
-    cp -r "$APP_PATH" "$BUILD_DIR/Payload/"
-    (cd "$BUILD_DIR" && zip -qry "export/${SCHEME}-enterprise.ipa" Payload)
-    rm -rf "$BUILD_DIR/Payload"
+    echo "[-] zsign not found. Copying unsigned IPA to $OUTPUT_IPA..."
+    cp "$UNSIGNED_IPA" "$OUTPUT_IPA"
 fi
 
 echo "[✓] Deployment package successfully generated: $OUTPUT_IPA"

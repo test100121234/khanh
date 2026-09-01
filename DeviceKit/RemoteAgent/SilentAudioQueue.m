@@ -1,4 +1,5 @@
 #import "SilentAudioQueue.h"
+#import <UIKit/UIKit.h>
 
 #define NUM_BUFFERS 3
 #define BUFFER_SIZE 8192 // 8KB @ 8kHz = ~0.512s per buffer (reduces wakeups to ~2Hz)
@@ -13,8 +14,8 @@
 @end
 
 static void HandleOutputBuffer(void *aqData, AudioQueueRef inAQ, AudioQueueBufferRef inBuffer) {
-    SilentAudioQueue *self = (__bridge SilentAudioQueue *)aqData;
-    if (!self->_running) return;
+    SilentAudioQueue *queue = (__bridge SilentAudioQueue *)aqData;
+    if (![queue isRunning]) return;
     
     // Fill buffer with 0s (PCM silence) - 0.00% CPU consumption
     memset(inBuffer->mAudioData, 0, inBuffer->mAudioDataBytesCapacity);

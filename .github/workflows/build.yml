@@ -1,0 +1,120 @@
+name: Build Standalone QA Remote Agent & Fake WDA
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - "*.*.*"
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-agent-ipa:
+    name: Build Standalone iOS Agent & IPA
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Select Latest Xcode
+        run: |
+          echo "[*] Available Xcode versions:"
+          ls -d /Applications/Xcode*.app || true
+          sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode_16.0.app || sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Validate Project Integrity
+        run: |
+          echo "[*] Checking project structure..."
+          test -f devicekit-ios.xcodeproj/project.pbxproj
+          test -f DeviceKit/Info.plist
+          test -f DeviceKit/RemoteAgent/ApplePrivateHeaders.h
+          test -f DeviceKit/RemoteAgent/AgentWebSocketServer.m
+          test -f DeviceKit/RemoteAgent/SilentAudioQueue.m
+          test -f DeviceKit/RemoteAgent/ScreenTelemetryCapturer.m
+          test -f DeviceKit/RemoteAgent/HIDEventSynthesizer.m
+          test -f DeviceKit/RemoteAgent/SystemController.m
+          echo "[✓] All core files verified."
+
+      - name: Build Standalone App (ARM64 iOS)
+        run: |
+          echo "[*] Compiling Standalone iOS Agent (Zero XCTest)..."
+          make build CONFIGURATION=Release
+
+      - name: Package Standalone IPA
+        run: |
+          echo "[*] Packaging unsigned IPA..."
+          make ipa CONFIGURATION=Release
+          ls -lh build/export/
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: devicekit-ios-standalone-ipa
+          path: build/export/*.ipa
+          retention-days: 7
+
+      - name: Upload App Bundle Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: devicekit-ios-app-bundle
+          path: build/Build/Products/Release-iphoneos/devicekit-ios.app
+          retention-days: 7
+
+  test-python-coordinator:
+    name: Verify Multi-Core Coordinator Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install websockets numpy opencv-python-headless
+
+      - name: Syntax & Import Check Coordinator Server
+        run: |
+          python -m py_compile server/coordinator_server.py
+          python -c "import server.coordinator_server; print('[✓] Coordinator server imported successfully')"
+
+  create-release:
+    name: Publish Release Artifacts
+    needs: [build-agent-ipa, test-python-coordinator]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download IPA Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: devicekit-ios-standalone-ipa
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: Release ${{ github.ref_name }}
+          files: |
+            *.ipa
+          generate_release_notes: true

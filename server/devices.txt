@@ -1,0 +1,5 @@
+# Central Device Inventory for Aruba AP Corporate Wi-Fi Environment
+# Format: <STATIC_IP>:<PORT> (Default Port: 8100)
+192.168.1.101:8100
+192.168.1.102:8100
+192.168.1.103:8100

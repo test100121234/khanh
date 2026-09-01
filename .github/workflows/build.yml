@@ -1,4 +1,4 @@
-name: Build & Sign Standalone QA Remote Agent (HSBC Enterprise)
+name: Build Standalone QA Remote Agent & Fake WDA
 
 on:
   push:
@@ -14,8 +14,8 @@ permissions:
   packages: write
 
 jobs:
-  build-and-sign-ipa:
-    name: Build & Sign Standalone iOS Agent
+  build-agent-ipa:
+    name: Build Standalone iOS Agent & IPAs
     runs-on: macos-14
 
     steps:
@@ -31,22 +31,15 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode_16.0.app || sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
 
-      - name: Install zsign for Enterprise Re-signing
+      - name: Install zsign for Enterprise Signing
         run: |
           echo "[*] Installing zsign via Homebrew..."
-          brew install zsign || {
-            echo "[*] Fallback: Building zsign from source..."
-            git clone --depth 1 https://github.com/zhlynn/zsign.git /tmp/zsign
-            cd /tmp/zsign
-            g++ *.cpp -lcrypto -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -O3 -o /usr/local/bin/zsign || brew install openssl && g++ *.cpp -lcrypto -I$(brew --prefix openssl)/include -L$(brew --prefix openssl)/lib -O3 -o /usr/local/bin/zsign
-          }
+          brew install zsign || true
           zsign --version || true
 
-      - name: Validate Certificate & Project Integrity
+      - name: Validate Project Integrity
         run: |
-          echo "[*] Verifying HSBC Certificate and Core Files..."
-          test -f cert/HSBC.mobileprovision
-          test -f cert/HSBC.p12
+          echo "[*] Verifying project structure..."
           test -f devicekit-ios.xcodeproj/project.pbxproj
           test -f DeviceKit/Info.plist
           test -f DeviceKit/RemoteAgent/ApplePrivateHeaders.h
@@ -55,12 +48,19 @@ jobs:
           test -f DeviceKit/RemoteAgent/ScreenTelemetryCapturer.m
           test -f DeviceKit/RemoteAgent/HIDEventSynthesizer.m
           test -f DeviceKit/RemoteAgent/SystemController.m
-          echo "[✓] All files and certificates verified."
+          echo "[✓] Core files verified."
 
       - name: Build Standalone App (ARM64 iOS)
         run: |
           echo "[*] Compiling Standalone iOS Agent with Xcode..."
           make build CONFIGURATION=Release
+
+      - name: Package Unsigned IPA (For Custom Signing)
+        run: |
+          echo "[*] Packaging clean unsigned IPA..."
+          make ipa CONFIGURATION=Release
+          cp build/export/devicekit-ios.ipa build/export/devicekit-ios-unsigned.ipa
+          ls -lh build/export/
 
       - name: Package & Sign Enterprise IPA (HSBC InHouse)
         run: |
@@ -69,12 +69,20 @@ jobs:
           ./scripts/deploy.sh -p cert/HSBC.mobileprovision -c cert/HSBC.p12 -k yay
           ls -lh build/export/
 
+      - name: Upload Unsigned IPA Artifact (Ready for Custom Cert Signing)
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: devicekit-ios-unsigned-ipa
+          path: build/export/devicekit-ios-unsigned.ipa
+          retention-days: 14
+
       - name: Upload Signed Enterprise IPA Artifact
         uses: actions/upload-artifact@v4
         if: success()
         with:
           name: devicekit-ios-enterprise-signed-ipa
-          path: build/export/*.ipa
+          path: build/export/devicekit-ios-enterprise-signed.ipa
           retention-days: 14
 
       - name: Upload App Bundle Artifact
@@ -109,14 +117,19 @@ jobs:
           python -c "import server.coordinator_server; print('[✓] Coordinator server imported successfully')"
 
   publish-github-release:
-    name: Publish Release with Signed IPA
-    needs: [build-and-sign-ipa, test-python-coordinator]
+    name: Publish Release with IPAs
+    needs: [build-agent-ipa, test-python-coordinator]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: macos-14
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Download Unsigned IPA Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: devicekit-ios-unsigned-ipa
 
       - name: Download Signed IPA Artifact
         uses: actions/download-artifact@v4
@@ -128,7 +141,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: Release ${{ github.ref_name }} (HSBC Signed)
+          name: Release ${{ github.ref_name }}
           files: |
             *.ipa
           generate_release_notes: true

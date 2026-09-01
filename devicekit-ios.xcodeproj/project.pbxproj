@@ -345,7 +345,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = B8BGPMF2XK;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "DeviceKit/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -355,9 +355,9 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mobilenext.devicekit-ios";
+				PRODUCT_BUNDLE_IDENTIFIER = hk.com.hsbc.enterprise.hsbchkrewards.local2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PROVISIONING_PROFILE_SPECIFIER = "hk.com.hsbc.enterprise.hsbchkrewards.local2 InHouse";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "DeviceKit/RemoteAgent/DeviceKitAgent-Bridging-Header.h";
 				SWIFT_VERSION = 5.9;
@@ -373,7 +373,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = B8BGPMF2XK;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "DeviceKit/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -383,9 +383,9 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mobilenext.devicekit-ios";
+				PRODUCT_BUNDLE_IDENTIFIER = hk.com.hsbc.enterprise.hsbchkrewards.local2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PROVISIONING_PROFILE_SPECIFIER = "hk.com.hsbc.enterprise.hsbchkrewards.local2 InHouse";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "DeviceKit/RemoteAgent/DeviceKitAgent-Bridging-Header.h";
 				SWIFT_VERSION = 5.9;

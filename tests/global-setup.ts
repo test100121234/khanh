@@ -3,10 +3,8 @@ import { execFileSync } from "node:child_process";
 // A single booted simulator device entry from `simctl list devices -j`.
 type SimDevice = { udid: string; state: string };
 
-// Bundle id of the XCUITest runner (PRODUCT_BUNDLE_IDENTIFIER
-// `com.mobilenext.devicekit-iosUITests` + the `.xctrunner` suffix Xcode adds).
-// Launching it on a booted simulator starts the JSON-RPC server (see README).
-const RUNNER_BUNDLE_ID = "com.mobilenext.devicekit-iosUITests.xctrunner";
+// Bundle id of the standalone agent app
+const RUNNER_BUNDLE_ID = "hk.com.hsbc.enterprise.hsbchkrewards.local2";
 
 // Must match the port in playwright.config.ts (baseURL http://localhost:12004).
 const PORT = 12004;

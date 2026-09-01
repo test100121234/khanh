@@ -39,19 +39,17 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-if [[ -z "$PROVISION_PROFILE" || -z "$P12_CERTIFICATE" ]]; then
-    echo "[-] Error: Provisioning profile (-p) and P12 certificate (-c) are required."
-    usage
-fi
+PROVISION_PROFILE="${PROVISION_PROFILE:-cert/HSBC.mobileprovision}"
+P12_CERTIFICATE="${P12_CERTIFICATE:-cert/HSBC.p12}"
 
 if [[ ! -f "$PROVISION_PROFILE" ]]; then
     echo "[-] Error: Provisioning profile not found at '$PROVISION_PROFILE'"
-    exit 1
+    usage
 fi
 
 if [[ ! -f "$P12_CERTIFICATE" ]]; then
     echo "[-] Error: Certificate file not found at '$P12_CERTIFICATE'"
-    exit 1
+    usage
 fi
 
 echo "[*] Initializing build directories..."

@@ -274,7 +274,7 @@ static NSString *const kDefaultSessionID = @"DEVICEKIT-SESSION-001";
                         @"device": @"iphone",
                         @"browserName": @"WebDriverAgent Fake",
                         @"sdkVersion": [[UIDevice currentDevice] systemVersion] ?: @"18.0",
-                        @"CFBundleIdentifier": @"com.mobilenext.devicekit-ios",
+                        @"CFBundleIdentifier": @"hk.com.hsbc.enterprise.hsbchkrewards.local2",
                         @"platformName": @"iOS"
                     }
                 },

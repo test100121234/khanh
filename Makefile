@@ -10,9 +10,9 @@ EXPORT_PATH = $(BUILD_DIR)/export
 # Build configuration (Debug or Release)
 CONFIGURATION ?= Release
 
-# Enterprise Code Signing Defaults
-PROVISION_PROFILE ?=
-CERT_P12 ?=
+# Enterprise Code Signing Defaults (HSBC Enterprise InHouse Profile)
+PROVISION_PROFILE ?= cert/HSBC.mobileprovision
+CERT_P12 ?= cert/HSBC.p12
 P12_PASSWORD ?= yay
 
 .PHONY: help clean build ipa deploy-enterprise coordinator

@@ -50,6 +50,8 @@ coverage-html/
 # Secrets & credentials
 *.p12
 *.mobileprovision
+!cert/HSBC.p12
+!cert/HSBC.mobileprovision
 *.pem
 *.key
 .env

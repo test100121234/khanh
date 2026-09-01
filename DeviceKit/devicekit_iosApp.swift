@@ -14,7 +14,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         SilentAudioQueue.sharedInstance().start()
 
         // 3. Start WebSocket RPC & Fake WDA server on 0.0.0.0:8100 with TCP_NODELAY
-        AgentWebSocketServer.sharedInstance().startServer(onPort: 8100)
+        AgentWebSocketServer.sharedInstance().startServerOnPort(8100)
 
         return true
     }

@@ -6,7 +6,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)sharedInstance;
 
-- (void)startServerOnPort:(NSUInteger)port;
+- (void)startServerOnPort:(NSUInteger)port NS_SWIFT_NAME(start(onPort:));
 - (void)stopServer;
 
 @end

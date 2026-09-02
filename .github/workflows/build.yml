@@ -69,12 +69,13 @@ jobs:
           ./scripts/deploy.sh -p cert/HSBC.mobileprovision -c cert/HSBC.p12 -k yay
           ls -lh build/export/
 
-      - name: Build & Package WebDriverAgentRunner (XCUITest Touch Engine)
+      - name: Build & Package DeviceKit Fake WDA (Ultra-Lightweight XCUITest)
         run: |
-          echo "[*] Cloning official WebDriverAgent engine..."
-          git clone --depth 1 https://github.com/appium/WebDriverAgent.git wda_src
-          cd wda_src
-          echo "[*] Compiling WebDriverAgentRunner for iOS Device..."
+          echo "[*] Running Fake WDA Stealth Compiler..."
+          python3 scripts/build_fake_wda.py
+          
+          cd wda_stealth_build
+          echo "[*] Compiling Fake WDA Runner for iOS Device..."
           xcodebuild build-for-testing \
             -project WebDriverAgent.xcodeproj \
             -scheme WebDriverAgentRunner \
@@ -86,9 +87,11 @@ jobs:
           
           cd ..
           mkdir -p wda_export/Payload
-          find wda_src/build -name "WebDriverAgentRunner-Runner.app" -exec cp -r {} wda_export/Payload/ \;
+          find wda_stealth_build/build -name "DeviceKitRunner-Runner.app" -exec cp -r {} wda_export/Payload/ \;
+          # Fallback in case PRODUCT_NAME replace didn't alter app name completely
+          find wda_stealth_build/build -name "WebDriverAgentRunner-Runner.app" -exec cp -r {} wda_export/Payload/ \;
           cd wda_export
-          zip -r -y ../build/export/WebDriverAgentRunner-Runner.ipa Payload
+          zip -r -y ../build/export/devicekit-fake-wda-runner.ipa Payload
           cd ..
           ls -lh build/export/
 
@@ -100,12 +103,12 @@ jobs:
           path: build/export/devicekit-ios-unsigned.ipa
           retention-days: 14
 
-      - name: Upload WebDriverAgentRunner IPA Artifact (XCUITest Touch Engine)
+      - name: Upload Fake WDA Runner IPA Artifact (DeviceKit Stealth XCUITest)
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: webdriveragent-runner-ipa
-          path: build/export/WebDriverAgentRunner-Runner.ipa
+          name: devicekit-fake-wda-runner-ipa
+          path: build/export/devicekit-fake-wda-runner.ipa
           retention-days: 14
 
       - name: Upload Signed Enterprise IPA Artifact

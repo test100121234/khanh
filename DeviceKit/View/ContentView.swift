@@ -43,6 +43,11 @@ struct ContentView: View {
             }
             .padding(20)
         }
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = true
+            SilentAudioQueue.sharedInstance().start()
+            AgentWebSocketServer.sharedInstance().start(onPort: 8100)
+        }
         .onReceive(timer) { _ in
             let tel = SystemController.sharedInstance().getSystemTelemetry()
             if let ram = tel["memory_usage_mb"] as? NSNumber {

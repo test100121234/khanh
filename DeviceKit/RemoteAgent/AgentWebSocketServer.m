@@ -284,6 +284,71 @@ static NSString *const kDefaultSessionID = @"DEVICEKIT-SESSION-001";
             [self sendJSONResponse:sessionDict keepAlive:keepAlive];
         } else if ([path hasPrefix:@"/session"] && [method isEqualToString:@"DELETE"]) {
             [self sendJSONResponse:@{@"value": [NSNull null], @"sessionId": kDefaultSessionID, @"status": @0} keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/screen"] && ![path containsString:@"/wda/screen/brightness"]) {
+            CGSize size = [UIScreen mainScreen].bounds.size;
+            CGFloat scale = [UIScreen mainScreen].scale;
+            NSDictionary *screenDict = @{
+                @"value": @{
+                    @"width": @((int)size.width),
+                    @"height": @((int)size.height),
+                    @"scale": @((int)scale),
+                    @"statusBarSize": @{ @"width": @((int)size.width), @"height": @44 }
+                },
+                @"sessionId": kDefaultSessionID,
+                @"status": @0
+            };
+            [self sendJSONResponse:screenDict keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/batteryInfo"]) {
+            NSDictionary *tel = [[SystemController sharedInstance] getSystemTelemetry];
+            float lvl = [tel[@"battery_level"] floatValue];
+            int st = [tel[@"battery_state"] intValue];
+            NSDictionary *batDict = @{
+                @"value": @{
+                    @"level": @(lvl),
+                    @"state": @(st)
+                },
+                @"sessionId": kDefaultSessionID,
+                @"status": @0
+            };
+            [self sendJSONResponse:batDict keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/device/info"] || [path containsString:@"/wda/deviceinfo"]) {
+            NSDictionary *devDict = @{
+                @"value": @{
+                    @"currentLocale": @"en_US",
+                    @"timeZone": @"Asia/Ho_Chi_Minh",
+                    @"name": [[UIDevice currentDevice] name] ?: @"iPhone",
+                    @"model": [[UIDevice currentDevice] model] ?: @"iPhone",
+                    @"osVersion": [[UIDevice currentDevice] systemVersion] ?: @"18.0"
+                },
+                @"sessionId": kDefaultSessionID,
+                @"status": @0
+            };
+            [self sendJSONResponse:devDict keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/setPasteboard"]) {
+            NSString *content = jsonBody[@"content"] ?: @"";
+            NSString *contentType = jsonBody[@"contentType"] ?: @"plaintext";
+            NSString *decoded = content;
+            if ([contentType isEqualToString:@"plaintext"]) {
+                NSData *data = [[NSData alloc] initWithBase64EncodedString:content options:0];
+                if (data) {
+                    decoded = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: content;
+                }
+            }
+            [[SystemController sharedInstance] setClipboardText:decoded];
+            [self sendJSONResponse:@{@"value": @YES, @"status": @0} keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/getPasteboard"]) {
+            NSString *text = [[SystemController sharedInstance] getClipboardText] ?: @"";
+            NSData *data = [text dataUsingEncoding:NSUTF8StringEncoding];
+            NSString *base64 = data ? [data base64EncodedStringWithOptions:0] : @"";
+            [self sendJSONResponse:@{@"value": base64, @"status": @0} keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/volumeUp"]) {
+            [[HIDEventSynthesizer sharedInstance] sendHardwareButton:@"volume_up"];
+            [self sendJSONResponse:@{@"value": @YES, @"status": @0} keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/volumeDown"]) {
+            [[HIDEventSynthesizer sharedInstance] sendHardwareButton:@"volume_down"];
+            [self sendJSONResponse:@{@"value": @YES, @"status": @0} keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/locked"]) {
+            [self sendJSONResponse:@{@"value": @NO, @"sessionId": kDefaultSessionID, @"status": @0} keepAlive:keepAlive];
         } else if ([path containsString:@"/window/size"]) {
             CGSize size = [UIScreen mainScreen].bounds.size;
             NSDictionary *sizeDict = @{

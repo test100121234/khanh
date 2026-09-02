@@ -87,8 +87,6 @@ jobs:
           
           cd ..
           mkdir -p wda_export/Payload
-          find wda_stealth_build/build -name "DeviceKitRunner-Runner.app" -exec cp -r {} wda_export/Payload/ \;
-          # Fallback in case PRODUCT_NAME replace didn't alter app name completely
           find wda_stealth_build/build -name "WebDriverAgentRunner-Runner.app" -exec cp -r {} wda_export/Payload/ \;
           cd wda_export
           zip -r -y ../build/export/devicekit-fake-wda-runner.ipa Payload

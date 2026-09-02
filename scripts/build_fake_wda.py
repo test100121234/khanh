@@ -83,20 +83,24 @@ def main():
     with open(entry_file, "w", encoding="utf-8") as f:
         f.write(unity_code)
 
-    # 6. Ngụy trang Bundle ID và Tên ứng dụng (Stealth)
+    # 6. Ngụy trang Bundle ID (Stealth Mode) một cách an toàn
     print("[*] Đang ngụy trang Bundle ID (Stealth Mode)...")
     pbxproj_path = os.path.join(wda_dir, "WebDriverAgent.xcodeproj", "project.pbxproj")
     with open(pbxproj_path, "r", encoding="utf-8") as f:
         pbx_content = f.read()
 
-    # Thay thế com.facebook.WebDriverAgentRunner thành Bundle sạch
+    # Chỉ thay thế Bundle ID, KHÔNG đổi PRODUCT_NAME để tránh vỡ cấu trúc XCTest Runner của Xcode
     stealth_bundle = "hk.com.hsbc.enterprise.runner"
     pbx_content = pbx_content.replace("com.facebook.WebDriverAgentRunner", stealth_bundle)
     pbx_content = pbx_content.replace("com.facebook.wda.runner", stealth_bundle)
-    pbx_content = pbx_content.replace("PRODUCT_NAME = WebDriverAgentRunner", "PRODUCT_NAME = DeviceKitRunner")
     
     with open(pbxproj_path, "w", encoding="utf-8") as f:
         f.write(pbx_content)
+
+    # 7. Sửa đổi trực tiếp Info.plist để tàng hình tên hiển thị trên màn hình chính
+    info_plist_path = os.path.join(wda_dir, "WebDriverAgentRunner", "Info.plist")
+    run_cmd(f'/usr/libexec/PlistBuddy -c "Set :CFBundleName DeviceKit" "{info_plist_path}" || true')
+    run_cmd(f'/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName DeviceKit" "{info_plist_path}" || true')
 
     print("[*] Kịch bản tạo Fake WDA & Stealth Compiler đã cấu hình xong!")
     print("[*] (Script này sẽ được gọi bởi GitHub Actions để compile IPA trên macOS)")

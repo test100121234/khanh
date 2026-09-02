@@ -57,8 +57,8 @@ def main():
     
     // Tắt các tính năng rác của Appium nếu có chạy ngầm
     // Khởi động server nội bộ siêu nhẹ của DeviceKit
-    AgentWebSocketServer *server = [AgentWebSocketServer sharedServer];
-    [server startOnPort:8100];
+    AgentWebSocketServer *server = [AgentWebSocketServer sharedInstance];
+    [server startServerOnPort:8100];
     
     // Giữ cho luồng XCTest sống vĩnh viễn (nhường đường cho testmanagerd)
     NSLog(@"[🚀 DEVICEKIT] Kênh testmanagerd đã mở. Nhường đường cho OS xử lý sự kiện qua port 8100...");

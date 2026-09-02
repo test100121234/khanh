@@ -458,10 +458,14 @@ static NSString *const kDefaultSessionID = @"DEVICEKIT-SESSION-001";
             [self sendJSONResponse:@{@"value": @(success), @"status": @0} keepAlive:keepAlive];
         } else if ([path containsString:@"/wda/apps/state"]) {
             [self sendJSONResponse:@{@"value": @4, @"sessionId": kDefaultSessionID, @"status": @0} keepAlive:keepAlive]; // 4 = Running Foreground
-        } else if ([path containsString:@"/wda/deeplink"] || [path containsString:@"/wda/url"]) {
-            NSString *url = jsonBody[@"url"];
-            BOOL success = url ? [[SystemController sharedInstance] openURLString:url] : NO;
-            [self sendJSONResponse:@{@"value": @(success), @"status": @0} keepAlive:keepAlive];
+        } else if ([path containsString:@"/wda/deeplink"] || [path containsString:@"/deeplink"] || [path containsString:@"/wda/url"] || [path hasSuffix:@"/url"] || [path containsString:@"/openurl"]) {
+            if ([method isEqualToString:@"GET"]) {
+                [self sendJSONResponse:@{@"value": @"", @"sessionId": kDefaultSessionID, @"status": @0} keepAlive:keepAlive];
+            } else {
+                NSString *url = jsonBody[@"url"] ?: (jsonBody[@"url_string"] ?: (jsonBody[@"deeplink"] ?: jsonBody[@"link"]));
+                BOOL success = url ? [[SystemController sharedInstance] openURLString:url] : NO;
+                [self sendJSONResponse:@{@"value": @(success), @"sessionId": kDefaultSessionID, @"status": @0} keepAlive:keepAlive];
+            }
         } else if ([path containsString:@"/wda/apps/terminate"]) {
             NSString *bundleID = jsonBody[@"bundleId"] ?: jsonBody[@"bundle_id"];
             if (bundleID) {

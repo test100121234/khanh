@@ -362,8 +362,11 @@ static NSString *const kDefaultSessionID = @"DEVICEKIT-SESSION-001";
             [self sendJSONResponse:sizeDict keepAlive:keepAlive];
         } else if ([path containsString:@"/rotation"]) {
             [self sendJSONResponse:@{@"value": @{@"x": @0, @"y": @0, @"z": @0}, @"sessionId": kDefaultSessionID, @"status": @0} keepAlive:keepAlive];
+        } else if ([path containsString:@"/mjpeg"] || [path containsString:@"/wda/stream"] || [path isEqualToString:@"/stream"]) {
+            [self handleMJPEGStreamRequest];
+            return;
         } else if ([path containsString:@"/screenshot"]) {
-            NSData *jpegData = [[ScreenTelemetryCapturer sharedInstance] captureSingleHardwareJPEGWithQuality:0.2];
+            NSData *jpegData = [[ScreenTelemetryCapturer sharedInstance] captureSingleHardwareJPEGWithQuality:0.35];
             NSString *base64 = jpegData ? [jpegData base64EncodedStringWithOptions:0] : @"";
             NSDictionary *resp = @{
                 @"value": base64,
@@ -541,6 +544,50 @@ static NSString *const kDefaultSessionID = @"DEVICEKIT-SESSION-001";
     if (!keepAlive) {
         [self close];
     }
+}
+
+- (void)handleMJPEGStreamRequest {
+    if (_socketFD <= 0) return;
+
+    NSString *mjpegHeader = @"HTTP/1.1 200 OK\r\n"
+                            "Server: DeviceKit-MJPEG\r\n"
+                            "Connection: close\r\n"
+                            "Cache-Control: no-cache, no-store, must-revalidate, pre-check=0, post-check=0, max-age=0\r\n"
+                            "Pragma: no-cache\r\n"
+                            "Expires: 0\r\n"
+                            "Access-Control-Allow-Origin: *\r\n"
+                            "Content-Type: multipart/x-mixed-replace; boundary=--boundarydonotcross\r\n\r\n";
+
+    NSData *headerData = [mjpegHeader dataUsingEncoding:NSUTF8StringEncoding];
+    ssize_t written = write(_socketFD, headerData.bytes, headerData.length);
+    if (written <= 0) return;
+
+    int clientFD = _socketFD;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        while (clientFD > 0) {
+            @autoreleasepool {
+                NSData *jpegData = [[ScreenTelemetryCapturer sharedInstance] captureSingleHardwareJPEGWithQuality:0.35];
+                if (jpegData && jpegData.length > 0) {
+                    NSString *boundary = [NSString stringWithFormat:
+                                          @"--boundarydonotcross\r\n"
+                                          "Content-Type: image/jpeg\r\n"
+                                          "Content-Length: %lu\r\n\r\n", (unsigned long)jpegData.length];
+                    NSData *boundaryData = [boundary dataUsingEncoding:NSUTF8StringEncoding];
+                    if (write(clientFD, boundaryData.bytes, boundaryData.length) <= 0) {
+                        break;
+                    }
+                    if (write(clientFD, jpegData.bytes, jpegData.length) <= 0) {
+                        break;
+                    }
+                    if (write(clientFD, "\r\n", 2) <= 0) {
+                        break;
+                    }
+                }
+            }
+            [NSThread sleepForTimeInterval:0.04]; // ~25 FPS Real-Time Screen Stream
+        }
+        close(clientFD);
+    });
 }
 
 // =============================================================================

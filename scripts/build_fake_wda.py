@@ -90,9 +90,10 @@ def main():
         pbx_content = f.read()
 
     # Chỉ thay thế Bundle ID, KHÔNG đổi PRODUCT_NAME để tránh vỡ cấu trúc XCTest Runner của Xcode
-    stealth_bundle = "hk.com.hsbc.enterprise.runner"
-    pbx_content = pbx_content.replace("com.facebook.WebDriverAgentRunner", stealth_bundle)
-    pbx_content = pbx_content.replace("com.facebook.wda.runner", stealth_bundle)
+    stealth_bundle_plugin = "hk.com.hsbc.enterprise.runner"
+    stealth_bundle_runner = "hk.com.hsbc.enterprise.runner.xctrunner"
+    pbx_content = pbx_content.replace("com.facebook.WebDriverAgentRunner", stealth_bundle_plugin)
+    pbx_content = pbx_content.replace("com.facebook.wda.runner", stealth_bundle_runner)
     
     with open(pbxproj_path, "w", encoding="utf-8") as f:
         f.write(pbx_content)

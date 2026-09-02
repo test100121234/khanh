@@ -124,6 +124,10 @@ typedef IOHIDEventRef (*IOHIDEventCreateKeyboardEventFunc)(
 
 typedef void (*IOHIDEventAppendEventFunc)(IOHIDEventRef parent, IOHIDEventRef child);
 typedef void (*IOHIDEventSetIntegerValueFunc)(IOHIDEventRef event, IOHIDEventField field, int value);
+typedef void (*IOHIDEventSetSenderIDFunc)(IOHIDEventRef event, uint64_t senderID);
+typedef void *IOHIDEventSystemClientRef;
+typedef IOHIDEventSystemClientRef (*IOHIDEventSystemClientCreateFunc)(CFAllocatorRef allocator);
+typedef void (*IOHIDEventSystemClientDispatchEventFunc)(IOHIDEventSystemClientRef client, IOHIDEventRef event);
 typedef void (*BKSHIDServicesPostEventFunc)(IOHIDEventRef event);
 
 // ============================================================================

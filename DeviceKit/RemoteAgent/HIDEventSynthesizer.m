@@ -13,6 +13,9 @@
     IOHIDEventCreateKeyboardEventFunc _IOHIDEventCreateKeyboardEvent;
     IOHIDEventAppendEventFunc _IOHIDEventAppendEvent;
     IOHIDEventSetIntegerValueFunc _IOHIDEventSetIntegerValue;
+    IOHIDEventSetSenderIDFunc _IOHIDEventSetSenderID;
+    IOHIDEventSystemClientRef _hidSystemClient;
+    IOHIDEventSystemClientDispatchEventFunc _IOHIDEventSystemClientDispatchEvent;
 }
 
 + (instancetype)sharedInstance {
@@ -64,6 +67,13 @@
         _IOHIDEventCreateKeyboardEvent = (IOHIDEventCreateKeyboardEventFunc)dlsym(_ioKitHandle, "IOHIDEventCreateKeyboardEvent");
         _IOHIDEventAppendEvent = (IOHIDEventAppendEventFunc)dlsym(_ioKitHandle, "IOHIDEventAppendEvent");
         _IOHIDEventSetIntegerValue = (IOHIDEventSetIntegerValueFunc)dlsym(_ioKitHandle, "IOHIDEventSetIntegerValue");
+        _IOHIDEventSetSenderID = (IOHIDEventSetSenderIDFunc)dlsym(_ioKitHandle, "IOHIDEventSetSenderID");
+        
+        IOHIDEventSystemClientCreateFunc clientCreate = (IOHIDEventSystemClientCreateFunc)dlsym(_ioKitHandle, "IOHIDEventSystemClientCreate");
+        _IOHIDEventSystemClientDispatchEvent = (IOHIDEventSystemClientDispatchEventFunc)dlsym(_ioKitHandle, "IOHIDEventSystemClientDispatchEvent");
+        if (clientCreate) {
+            _hidSystemClient = clientCreate(kCFAllocatorDefault);
+        }
     }
 }
 
@@ -72,7 +82,7 @@
 // =============================================================================
 
 - (void)postDigitizerEventAtX:(CGFloat)x y:(CGFloat)y touch:(BOOL)touch isStart:(BOOL)isStart {
-    if (!_BKSHIDServicesPostEvent || !_IOHIDEventCreateDigitizerEvent || !_IOHIDEventCreateDigitizerFingerEventWithUserData) {
+    if (!_IOHIDEventCreateDigitizerEvent || !_IOHIDEventCreateDigitizerFingerEventWithUserData) {
         return;
     }
 
@@ -88,7 +98,7 @@
 
         IOHIDEventRef parentEvent = _IOHIDEventCreateDigitizerEvent(
             kCFAllocatorDefault, timestamp,
-            kIOHIDDigitizerTransducerTypeHand,
+            kIOHIDDigitizerTransducerTypeFinger,
             0, 1, eventMask, 0,
             normX, normY, 0.0, 0.0, 0.0,
             touch, touch, 0
@@ -103,13 +113,22 @@
         );
 
         if (parentEvent && fingerEvent) {
+            if (_IOHIDEventSetSenderID) {
+                _IOHIDEventSetSenderID(parentEvent, 0xdefac83fa1100000ULL);
+                _IOHIDEventSetSenderID(fingerEvent, 0xdefac83fa1100000ULL);
+            }
             if (_IOHIDEventSetIntegerValue) {
                 _IOHIDEventSetIntegerValue(parentEvent, kIOHIDDigitizerEventFieldChildEventMask, eventMask);
             }
             if (_IOHIDEventAppendEvent) {
                 _IOHIDEventAppendEvent(parentEvent, fingerEvent);
             }
-            _BKSHIDServicesPostEvent(parentEvent);
+            if (_hidSystemClient && _IOHIDEventSystemClientDispatchEvent) {
+                _IOHIDEventSystemClientDispatchEvent(_hidSystemClient, parentEvent);
+            }
+            if (_BKSHIDServicesPostEvent) {
+                _BKSHIDServicesPostEvent(parentEvent);
+            }
             CFRelease(fingerEvent);
             CFRelease(parentEvent);
         }
@@ -210,7 +229,7 @@
 
         IOHIDEventRef parentEvent = _IOHIDEventCreateDigitizerEvent(
             kCFAllocatorDefault, timestamp,
-            kIOHIDDigitizerTransducerTypeHand,
+            kIOHIDDigitizerTransducerTypeFinger,
             0, 2, eventMask, 0,
             (norm1X + norm2X) / 2.0, (norm1Y + norm2Y) / 2.0, 0.0, 0.0, 0.0,
             touch, touch, 0
@@ -233,6 +252,11 @@
         );
 
         if (parentEvent && finger1 && finger2) {
+            if (_IOHIDEventSetSenderID) {
+                _IOHIDEventSetSenderID(parentEvent, 0xdefac83fa1100000ULL);
+                _IOHIDEventSetSenderID(finger1, 0xdefac83fa1100000ULL);
+                _IOHIDEventSetSenderID(finger2, 0xdefac83fa1100000ULL);
+            }
             if (_IOHIDEventSetIntegerValue) {
                 _IOHIDEventSetIntegerValue(parentEvent, kIOHIDDigitizerEventFieldChildEventMask, eventMask);
             }
@@ -240,7 +264,12 @@
                 _IOHIDEventAppendEvent(parentEvent, finger1);
                 _IOHIDEventAppendEvent(parentEvent, finger2);
             }
-            _BKSHIDServicesPostEvent(parentEvent);
+            if (_hidSystemClient && _IOHIDEventSystemClientDispatchEvent) {
+                _IOHIDEventSystemClientDispatchEvent(_hidSystemClient, parentEvent);
+            }
+            if (_BKSHIDServicesPostEvent) {
+                _BKSHIDServicesPostEvent(parentEvent);
+            }
             CFRelease(finger1);
             CFRelease(finger2);
             CFRelease(parentEvent);
@@ -287,12 +316,20 @@
 // =============================================================================
 
 - (void)sendKeyEventWithUsagePage:(uint32_t)usagePage usage:(uint32_t)usage down:(BOOL)down {
-    if (!_BKSHIDServicesPostEvent || !_IOHIDEventCreateKeyboardEvent) return;
+    if (!_IOHIDEventCreateKeyboardEvent) return;
     @try {
         uint64_t timestamp = mach_absolute_time();
         IOHIDEventRef event = _IOHIDEventCreateKeyboardEvent(kCFAllocatorDefault, timestamp, usagePage, usage, down, 0);
         if (event) {
-            _BKSHIDServicesPostEvent(event);
+            if (_IOHIDEventSetSenderID) {
+                _IOHIDEventSetSenderID(event, 0xdefac83fa1100000ULL);
+            }
+            if (_hidSystemClient && _IOHIDEventSystemClientDispatchEvent) {
+                _IOHIDEventSystemClientDispatchEvent(_hidSystemClient, event);
+            }
+            if (_BKSHIDServicesPostEvent) {
+                _BKSHIDServicesPostEvent(event);
+            }
             CFRelease(event);
         }
     } @catch (NSException *e) {

@@ -206,58 +206,33 @@ static void ScreenVTCompressionOutputCallback(void *outputCallbackRefCon,
 }
 
 - (nullable NSData *)captureSingleHardwareJPEGWithQuality:(float)quality {
-    dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER);
-
-    CVPixelBufferRef pixelBuffer = [self createPixelBufferFromScreen];
-    if (!pixelBuffer) {
-        dispatch_semaphore_signal(_lock);
-        return nil;
-    }
-
-    int32_t width = (int32_t)CVPixelBufferGetWidth(pixelBuffer);
-    int32_t height = (int32_t)CVPixelBufferGetHeight(pixelBuffer);
-
-    if (![self ensureCompressionSessionForWidth:width height:height quality:quality]) {
-        CVPixelBufferRelease(pixelBuffer);
-        dispatch_semaphore_signal(_lock);
-        return nil;
-    }
-
-    NSMutableData *jpegData = [NSMutableData data];
-    struct CompressionContext ctx;
-    ctx.outputData = jpegData;
-    ctx.semaphore = dispatch_semaphore_create(0);
-
-    CMTime presentationTimeStamp = CMTimeMake(mach_absolute_time(), 1000000000);
-    
-    // Encode frame with custom callback reference context
-    VTCompressionSessionEncodeFrameWithOutputHandler(_compressionSession,
-                                                     pixelBuffer,
-                                                     presentationTimeStamp,
-                                                     kCMTimeInvalid,
-                                                     NULL,
-                                                     NULL,
-                                                     ^(OSStatus status, VTEncodeInfoFlags infoFlags, CMSampleBufferRef sampleBuffer) {
-        if (status == noErr && sampleBuffer) {
-            CMBlockBufferRef blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer);
-            if (blockBuffer) {
-                size_t lengthAtOffset, totalLength;
-                char *dataPointer;
-                if (CMBlockBufferGetDataPointer(blockBuffer, 0, &lengthAtOffset, &totalLength, &dataPointer) == noErr) {
-                    [jpegData appendBytes:dataPointer length:totalLength];
-                }
+    __block NSData *result = nil;
+    dispatch_block_t block = ^{
+        @try {
+            CGRect bounds = [UIScreen mainScreen].bounds;
+            CGFloat scale = [UIScreen mainScreen].scale;
+            UIGraphicsBeginImageContextWithOptions(bounds.size, NO, scale);
+            UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
+            if (!keyWindow && [UIApplication sharedApplication].windows.count > 0) {
+                keyWindow = [UIApplication sharedApplication].windows.firstObject;
             }
+            [keyWindow drawViewHierarchyInRect:bounds afterScreenUpdates:NO];
+            UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+            UIGraphicsEndImageContext();
+            if (image) {
+                result = UIImageJPEGRepresentation(image, (CGFloat)quality);
+            }
+        } @catch (NSException *e) {
+            result = nil;
         }
-        dispatch_semaphore_signal(ctx.semaphore);
-    });
+    };
 
-    VTCompressionSessionCompleteFrames(_compressionSession, kCMTimeInvalid);
-    dispatch_semaphore_wait(ctx.semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(100 * NSEC_PER_MSEC)));
-
-    CVPixelBufferRelease(pixelBuffer);
-    dispatch_semaphore_signal(_lock);
-
-    return (jpegData.length > 0) ? jpegData : nil;
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+    return result;
 }
 
 @end

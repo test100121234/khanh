@@ -690,9 +690,11 @@ static NSString *const kDefaultSessionID = @"DEVICEKIT-SESSION-001";
 @end
 
 @implementation AgentWebSocketServer {
-    int _listenSocket;
+    int _listenSocket4;
+    int _listenSocket6;
     dispatch_queue_t _serverQueue;
-    dispatch_source_t _listenSource;
+    dispatch_source_t _listenSource4;
+    dispatch_source_t _listenSource6;
     dispatch_source_t _cleanupTimer;
     NSMutableArray<AgentWebSocketClient *> *_connectedClients;
 }
@@ -709,6 +711,8 @@ static NSString *const kDefaultSessionID = @"DEVICEKIT-SESSION-001";
 - (instancetype)init {
     self = [super init];
     if (self) {
+        _listenSocket4 = -1;
+        _listenSocket6 = -1;
         _serverQueue = dispatch_queue_create("com.devicekit.wsserver", DISPATCH_QUEUE_SERIAL);
         _connectedClients = [NSMutableArray array];
         [self startStaleConnectionReaper];
@@ -747,62 +751,103 @@ static NSString *const kDefaultSessionID = @"DEVICEKIT-SESSION-001";
 
 - (void)startServerOnPort:(NSUInteger)port {
     dispatch_async(_serverQueue, ^{
-        if (self->_listenSocket > 0) return;
+        if (self->_listenSocket4 > 0 || self->_listenSocket6 > 0) return;
 
-        self->_listenSocket = socket(AF_INET, SOCK_STREAM, 0);
-        if (self->_listenSocket < 0) return;
+        // 1. IPv4 Socket Listener (LAN / Wi-Fi / Ethernet)
+        self->_listenSocket4 = socket(AF_INET, SOCK_STREAM, 0);
+        if (self->_listenSocket4 > 0) {
+            int opt = 1;
+            setsockopt(self->_listenSocket4, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+            setsockopt(self->_listenSocket4, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt));
 
-        int opt = 1;
-        setsockopt(self->_listenSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-        setsockopt(self->_listenSocket, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt));
+            struct sockaddr_in address4;
+            memset(&address4, 0, sizeof(address4));
+            address4.sin_family = AF_INET;
+            address4.sin_addr.s_addr = htonl(INADDR_ANY);
+            address4.sin_port = htons((uint16_t)port);
 
-        struct sockaddr_in address;
-        memset(&address, 0, sizeof(address));
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = htonl(INADDR_ANY);
-        address.sin_port = htons((uint16_t)port);
+            if (bind(self->_listenSocket4, (struct sockaddr *)&address4, sizeof(address4)) == 0 &&
+                listen(self->_listenSocket4, 64) == 0) {
+                self->_listenSource4 = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, self->_listenSocket4, 0, self->_serverQueue);
+                __weak typeof(self) weakSelf = self;
 
-        if (bind(self->_listenSocket, (struct sockaddr *)&address, sizeof(address)) < 0) {
-            close(self->_listenSocket);
-            self->_listenSocket = -1;
-            return;
-        }
+                dispatch_source_set_event_handler(self->_listenSource4, ^{
+                    __strong typeof(weakSelf) strongSelf = weakSelf;
+                    if (!strongSelf) return;
 
-        if (listen(self->_listenSocket, 64) < 0) {
-            close(self->_listenSocket);
-            self->_listenSocket = -1;
-            return;
-        }
-
-        self->_listenSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, self->_listenSocket, 0, self->_serverQueue);
-        __weak typeof(self) weakSelf = self;
-
-        dispatch_source_set_event_handler(self->_listenSource, ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf) return;
-
-            struct sockaddr_in clientAddr;
-            socklen_t clientLen = sizeof(clientAddr);
-            int clientFD = accept(strongSelf->_listenSocket, (struct sockaddr *)&clientAddr, &clientLen);
-            if (clientFD > 0) {
-                AgentWebSocketClient *client = [[AgentWebSocketClient alloc] initWithSocket:clientFD];
-                [strongSelf->_connectedClients addObject:client];
+                    struct sockaddr_in clientAddr;
+                    socklen_t clientLen = sizeof(clientAddr);
+                    int clientFD = accept(strongSelf->_listenSocket4, (struct sockaddr *)&clientAddr, &clientLen);
+                    if (clientFD > 0) {
+                        AgentWebSocketClient *client = [[AgentWebSocketClient alloc] initWithSocket:clientFD];
+                        [strongSelf->_connectedClients addObject:client];
+                    }
+                });
+                dispatch_resume(self->_listenSource4);
+            } else {
+                close(self->_listenSocket4);
+                self->_listenSocket4 = -1;
             }
-        });
+        }
 
-        dispatch_resume(self->_listenSource);
+        // 2. IPv6 Socket Listener (Pure USB Tunnel / usbmuxd / iOS 18 loopback)
+        self->_listenSocket6 = socket(AF_INET6, SOCK_STREAM, 0);
+        if (self->_listenSocket6 > 0) {
+            int opt = 1;
+            setsockopt(self->_listenSocket6, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+            setsockopt(self->_listenSocket6, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt));
+            int v6only = 1;
+            setsockopt(self->_listenSocket6, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only));
+
+            struct sockaddr_in6 address6;
+            memset(&address6, 0, sizeof(address6));
+            address6.sin6_family = AF_INET6;
+            address6.sin6_addr = in6addr_any;
+            address6.sin6_port = htons((uint16_t)port);
+
+            if (bind(self->_listenSocket6, (struct sockaddr *)&address6, sizeof(address6)) == 0 &&
+                listen(self->_listenSocket6, 64) == 0) {
+                self->_listenSource6 = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, self->_listenSocket6, 0, self->_serverQueue);
+                __weak typeof(self) weakSelf = self;
+
+                dispatch_source_set_event_handler(self->_listenSource6, ^{
+                    __strong typeof(weakSelf) strongSelf = weakSelf;
+                    if (!strongSelf) return;
+
+                    struct sockaddr_in6 clientAddr;
+                    socklen_t clientLen = sizeof(clientAddr);
+                    int clientFD = accept(strongSelf->_listenSocket6, (struct sockaddr *)&clientAddr, &clientLen);
+                    if (clientFD > 0) {
+                        AgentWebSocketClient *client = [[AgentWebSocketClient alloc] initWithSocket:clientFD];
+                        [strongSelf->_connectedClients addObject:client];
+                    }
+                });
+                dispatch_resume(self->_listenSource6);
+            } else {
+                close(self->_listenSocket6);
+                self->_listenSocket6 = -1;
+            }
+        }
     });
 }
 
 - (void)stopServer {
     dispatch_sync(_serverQueue, ^{
-        if (self->_listenSource) {
-            dispatch_source_cancel(self->_listenSource);
-            self->_listenSource = nil;
+        if (self->_listenSource4) {
+            dispatch_source_cancel(self->_listenSource4);
+            self->_listenSource4 = nil;
         }
-        if (self->_listenSocket > 0) {
-            close(self->_listenSocket);
-            self->_listenSocket = -1;
+        if (self->_listenSocket4 > 0) {
+            close(self->_listenSocket4);
+            self->_listenSocket4 = -1;
+        }
+        if (self->_listenSource6) {
+            dispatch_source_cancel(self->_listenSource6);
+            self->_listenSource6 = nil;
+        }
+        if (self->_listenSocket6 > 0) {
+            close(self->_listenSocket6);
+            self->_listenSocket6 = -1;
         }
         for (AgentWebSocketClient *c in self->_connectedClients) {
             [c close];
